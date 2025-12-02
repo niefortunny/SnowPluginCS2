@@ -8,12 +8,12 @@ using CounterStrikeSharp.API.Modules.Utils;
 public partial class SnowPlugin : BasePlugin, IPluginConfig<SnowConfig>
 {
     public override string ModuleName => "Snow Plugin";
-    public override string ModuleVersion => "1.0.1";
-    public override string ModuleAuthor => "ALBAN1776";
+    public override string ModuleVersion => "1.0.2";
+    public override string ModuleAuthor => "ALBAN1776 | fork: unfortunate";
     public override string ModuleDescription => "Creates snow particle";
 
     public SnowConfig Config { get; set; } = new();
-    private readonly Dictionary<int, uint> _activeParticles = [];
+    private readonly Dictionary<int, CParticleSystem> _activeParticles = [];
 
     public void OnConfigParsed(SnowConfig config)
     {
@@ -25,7 +25,7 @@ public partial class SnowPlugin : BasePlugin, IPluginConfig<SnowConfig>
         RegisterListener<Listeners.OnClientDisconnectPost>(OnClientDisconnect);
 
         RegisterListener<Listeners.OnServerPrecacheResources>(
-            (manifest) => manifest.AddResource("particles/snow.vpcf")
+            (manifest) => manifest.AddResource(Config.ParticleName)
         );
     }
 
@@ -38,14 +38,16 @@ public partial class SnowPlugin : BasePlugin, IPluginConfig<SnowConfig>
     public HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
         var player = @event.Userid;
-        if (player == null || !player.IsValid || player.IsBot)
+        if (
+            player == null
+            || !player.IsValid
+            || player.IsBot
+            || !PlayerCookies.TryGetValue(player, out var cookie)
+            || !cookie.SnowEffect
+        )
             return HookResult.Continue;
 
         RemoveSnow(player.Slot);
-
-        if (!PlayerCookies.TryGetValue(player, out var cookie) || !cookie.SnowEffect)
-            return HookResult.Continue;
-
         AddTimer(0.3f, () => CreateSnow(player));
 
         return HookResult.Continue;
@@ -61,9 +63,7 @@ public partial class SnowPlugin : BasePlugin, IPluginConfig<SnowConfig>
             || ClientprefsApi == null
             || Cookies[CookieType.SnowEffect] == -1
         )
-        {
             return;
-        }
 
         string? newValue = PlayerCookies[player].SnowEffect ? "false" : "true";
 
@@ -82,10 +82,11 @@ public partial class SnowPlugin : BasePlugin, IPluginConfig<SnowConfig>
 
     private void CreateSnow(CCSPlayerController player)
     {
-        if (player?.PlayerPawn?.Value == null || !player.PlayerPawn.IsValid)
+        if (player is null || player.PlayerPawn.Value == null || !player.PlayerPawn.IsValid)
             return;
+
         var pawn = player.PlayerPawn.Value;
-        if (!pawn.IsValid)
+        if (pawn is null || !pawn.IsValid)
             return;
 
         RemoveSnow(player.Slot);
@@ -111,20 +112,20 @@ public partial class SnowPlugin : BasePlugin, IPluginConfig<SnowConfig>
             }
         });
 
-        _activeParticles[player.Slot] = particle.Index;
+        _activeParticles[player.Slot] = particle;
     }
 
     private void RemoveSnow(int slot)
     {
-        if (_activeParticles.TryGetValue(slot, out var entIndex))
-        {
-            var entity = Utilities.GetEntityFromIndex<CParticleSystem>((int)entIndex);
-            if (entity != null && entity.IsValid)
-            {
-                entity.AcceptInput("Stop");
-                entity.Remove();
-            }
-            _activeParticles.Remove(slot);
-        }
+        if (!_activeParticles.TryGetValue(slot, out var particle))
+            return;
+
+        if (particle is null || particle.IsValid)
+            return;
+
+        particle.AcceptInput("Stop");
+        particle.Remove();
+
+        _activeParticles.Remove(slot);
     }
 }
