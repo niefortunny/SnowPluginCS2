@@ -8,7 +8,7 @@ using CounterStrikeSharp.API.Modules.Utils;
 public partial class SnowPlugin : BasePlugin, IPluginConfig<SnowConfig>
 {
     public override string ModuleName => "Snow Plugin";
-    public override string ModuleVersion => "1.0.2";
+    public override string ModuleVersion => "1.0.2-fix";
     public override string ModuleAuthor => "ALBAN1776 | fork: unfortunate";
     public override string ModuleDescription => "Creates snow particle";
 
@@ -120,7 +120,7 @@ public partial class SnowPlugin : BasePlugin, IPluginConfig<SnowConfig>
         if (!_activeParticles.TryGetValue(slot, out var particle))
             return;
 
-        if (particle is null || particle.IsValid)
+        if (particle is null || !particle.IsValid)
             return;
 
         particle.AcceptInput("Stop");
